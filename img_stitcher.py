@@ -10,13 +10,10 @@ init(autoreset=True)
 
 class CustomFormatter(logging.Formatter):
     def format(self, record):
-        if record.levelno == logging.INFO:
-            prefix_color = Fore.GREEN
-        elif record.levelno == logging.ERROR:
-            prefix_color = Fore.RED
-        else:
-            prefix_color = Fore.RESET
-
+        prefix_color = {
+            logging.INFO: Fore.GREEN,
+            logging.ERROR: Fore.RED
+        }.get(record.levelno, Fore.RESET)
         formatted_message = super().format(record)
         return f"{prefix_color}{formatted_message}{Fore.RESET}"
 
