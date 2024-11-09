@@ -1,6 +1,6 @@
+import argparse
 import logging
 import re
-import sys
 
 from PIL import Image
 from colorama import init, Fore
@@ -89,19 +89,24 @@ def expand_patterns(patterns):
     return expanded_list
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        logging.error(
-            "Usage: python img_stitcher.py output_image_path "
-            "input_image_path1 [input_image_path2 ...]"
-        )
-    else:
-        output_path = sys.argv[1]
-        input_patterns = sys.argv[2:]
-        input_paths = expand_patterns(input_patterns)
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Concatenate images vertically.")
+    parser.add_argument("input_paths", nargs="+",
+                        help="Input image paths or patterns")
+    parser.add_argument("-o", "--output", required=True,
+                        help="Output image path")
+    return parser.parse_args()
 
-        if not input_paths:
-            logging.error(
-                "No valid image files found based on the input patterns.")
-        else:
-            concatenate_images_vertically(input_paths, output_path)
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    output_path = args.output
+    input_patterns = args.input_paths
+    input_paths = expand_patterns(input_patterns)
+
+    if not input_paths:
+        logging.error("No valid image files found based on the input patterns.")
+    else:
+        concatenate_images_vertically(input_paths, output_path)
