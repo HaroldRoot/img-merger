@@ -23,7 +23,6 @@ logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
 formatter = CustomFormatter('[%(levelname)s] - %(message)s')
 handler.setFormatter(formatter)
-
 if not logger.hasHandlers():
     logger.addHandler(handler)
 
@@ -35,9 +34,9 @@ def concatenate_images_vertically(image_paths, output_path):
             img = Image.open(image_path)
             images.append(img)
         except FileNotFoundError:
-            logging.error(f"Warning: File not found - {image_path}")
+            logging.error(f"File not found - {image_path}")
         except IOError:
-            logging.error(f"Warning: Could not open image file - {image_path}")
+            logging.error(f"Could not open image file - {image_path}")
 
     if not images:
         logging.error("No valid images to concatenate.")
@@ -64,7 +63,6 @@ def concatenate_images_vertically(image_paths, output_path):
 def expand_patterns(patterns):
     expanded_list = []
     for pattern in patterns:
-
         match = re.search(r'\[(\d+)-(\d+)]', pattern)
         if match:
             start, end = int(match.group(1)), int(match.group(2))
