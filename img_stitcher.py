@@ -151,11 +151,10 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    input_paths = expand_patterns(args.input_paths, args.extension)
-    if not input_paths:
-        logger.error(
-            "No valid image files found based on the input.")
-    batch_concatenate_images(input_paths, args.output_path, args.n,
-                             args.extension, args.width)
+args = parse_args()
+input_paths = expand_patterns(args.input_paths, args.extension)
+if not input_paths:
+    logger.error(
+        "No valid image files found based on the input.")
+batch_concatenate_images(input_paths, args.output_path, args.n,
+                         args.extension, args.width)
