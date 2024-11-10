@@ -1,6 +1,7 @@
 import argparse
 import logging
 import re
+from pathlib import Path
 
 from PIL import Image
 from colorama import init, Fore
@@ -60,6 +61,37 @@ def concatenate_images_vertically(image_paths, output_path):
         logging.error("Could not save the concatenated image.")
 
 
+def batch_concatenate_images(directory, output_dir, n, ext, output_pattern):
+    image_files = sorted(Path(directory).glob(f"*.{ext}"))
+    if not image_files:
+        logger.error(f"No images found with extension {ext} in {directory}.")
+        return
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not output_pattern.endswith(f".{ext}"):
+        output_pattern += f".{ext}"
+
+    if "[]" not in output_pattern:
+        output_pattern = output_pattern.replace(f".{ext}", f"[].{ext}")
+
+    total_batches = (len(image_files) + n - 1) // n
+    zero_padded_width = len(str(total_batches))
+    for batch_idx in range(total_batches):
+        batch_files = image_files[batch_idx * n:(batch_idx + 1) * n]
+        if not batch_files:
+            continue
+
+        # Format the output path
+        output_filename = output_pattern.replace(
+            "[]", f"{batch_idx + 1:0{zero_padded_width}}")
+        output_path = output_dir / output_filename
+
+        # Concatenate and save the batch
+        concatenate_images_vertically(batch_files, output_path)
+
+
 def expand_patterns(patterns):
     expanded_list = []
     for pattern in patterns:
@@ -87,21 +119,32 @@ def expand_patterns(patterns):
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Concatenate images vertically.")
-    parser.add_argument("input_paths", nargs="+",
+    parser.add_argument("input_paths", nargs="*",
                         help="Input image paths or patterns")
-    parser.add_argument("-o", "--output", required=True,
+    parser.add_argument("-o", "--output", default="output.jpg",
                         help="Output image path")
+    parser.add_argument("-d", "--directory",
+                        help="Directory with images to batch process")
+    parser.add_argument("-n", type=int, default=6,
+                        help="Number of images per batch in directory mode")
+    parser.add_argument("-e", "--extension", default="jpg",
+                        help="File extension for images in directory mode")
+    parser.add_argument("-od", "--output_directory", default=r".\outputs",
+                        help="Directory to save output images")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    output_path = args.output
-    input_patterns = args.input_paths
-    input_paths = expand_patterns(input_patterns)
-
-    if not input_paths:
-        logging.error("No valid image files found based on the input patterns.")
+    # Check if -d is specified for batch mode
+    if args.directory:
+        batch_concatenate_images(args.directory, args.output_directory, args.n,
+                                 args.extension, args.output)
     else:
-        concatenate_images_vertically(input_paths, output_path)
+        input_paths = expand_patterns(args.input_paths)
+        if not input_paths:
+            logger.error(
+                "No valid image files found based on the input patterns.")
+        else:
+            concatenate_images_vertically(input_paths, args.output)
