@@ -73,39 +73,32 @@ def concatenate_images_vertically(image_paths, output_path, width):
         logging.error("Could not save the concatenated image.")
 
 
-def batch_concatenate_images(directory, output_dir, n, ext, output_pattern,
-                             width):
-    image_files = sorted(Path(directory).glob(f"*.{ext}"))
-    if not image_files:
-        logger.error(f"No images found with extension {ext} in {directory}.")
-        return
-
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+def batch_concatenate_images(image_files, output_pattern, n, ext, width):
+    if "\\" in output_pattern:
+        output_dir = Path(output_pattern).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     if not output_pattern.endswith(f".{ext}"):
         output_pattern += f".{ext}"
 
-    if "[]" not in output_pattern:
-        output_pattern = output_pattern.replace(f".{ext}", f"[].{ext}")
-
     total_batches = (len(image_files) + n - 1) // n
-    zero_padded_width = len(str(total_batches))
-    for batch_idx in range(total_batches):
-        batch_files = image_files[batch_idx * n:(batch_idx + 1) * n]
-        if not batch_files:
-            continue
 
-        # Format the output path
-        output_filename = output_pattern.replace(
-            "[]", f"{batch_idx + 1:0{zero_padded_width}}")
-        output_path = output_dir / output_filename
+    if total_batches == 1:
+        concatenate_images_vertically(image_files, output_pattern, width)
+    else:
+        if "[]" not in output_pattern:
+            output_pattern = output_pattern.replace(f".{ext}", f"[].{ext}")
+        zero_padded_width = len(str(total_batches))
+        for batch_idx in range(total_batches):
+            batch_files = image_files[batch_idx * n:(batch_idx + 1) * n]
+            if not batch_files:
+                continue
+            output_path = output_pattern.replace(
+                "[]", f"{batch_idx + 1:0{zero_padded_width}}")
+            concatenate_images_vertically(batch_files, output_path, width)
 
-        # Concatenate and save the batch
-        concatenate_images_vertically(batch_files, output_path, width)
 
-
-def expand_patterns(patterns):
+def expand_patterns(patterns, ext):
     expanded_list = []
     for pattern in patterns:
         match = re.search(r'\[(\d+)-(\d+)]', pattern)
@@ -113,20 +106,32 @@ def expand_patterns(patterns):
             start, end = int(match.group(1)), int(match.group(2))
             num_length = len(match.group(1))
             for i in range(start, end + 1):
-                expanded_filename = re.sub(r'\[\d+-\d+]', f"{i:0{num_length}}",
-                                           pattern)
-                expanded_list.append(expanded_filename)
+                expanded_path = re.sub(r'\[\d+-\d+]', f"{i:0{num_length}}",
+                                       pattern)
+                expanded_list.append(expanded_path)
         else:
             match_single = re.search(r'\[(\d)-(\d)]', pattern)
             if match_single:
                 start, end = int(match_single.group(1)), int(
                     match_single.group(2))
                 for i in range(start, end + 1):
-                    expanded_filename = re.sub(r'\[\d-\d]', f"{i}", pattern)
-                    expanded_list.append(expanded_filename)
+                    expanded_path = re.sub(r'\[\d-\d]', f"{i}", pattern)
+                    expanded_list.append(expanded_path)
             else:
                 expanded_list.append(pattern)
-    return expanded_list
+
+    unfolded_list = []
+    for expanded_path in expanded_list:
+        path = Path(expanded_path)
+        if not path.exists():
+            logger.error(f"File or directory not exists - {path}")
+        elif path.is_file():
+            unfolded_list.append(path)
+        elif path.is_dir():
+            files = sorted(path.glob(f"*.{ext}"))
+            unfolded_list.extend(files)
+
+    return unfolded_list
 
 
 def parse_args():
@@ -134,16 +139,13 @@ def parse_args():
         description="Concatenate images vertically.")
     parser.add_argument("input_paths", nargs="*",
                         help="Input image paths or patterns")
-    parser.add_argument("-o", "--output", default="output.jpg",
-                        help="Output image path")
-    parser.add_argument("-d", "--directory",
-                        help="Directory with images to batch process")
+    parser.add_argument("-o", "--output_path",
+                        default=".\\outputs\\output.jpg",
+                        help="Output image path or pattern")
     parser.add_argument("-n", type=int, default=6,
-                        help="Number of images per batch in directory mode")
+                        help="Number of images per batch")
     parser.add_argument("-e", "--extension", default="jpg",
-                        help="File extension for images in directory mode")
-    parser.add_argument("-od", "--output_directory", default=r".\outputs",
-                        help="Directory to save output images")
+                        help="File extension for images")
     parser.add_argument("-w", "--width", type=int,
                         help="Width of output images")
     return parser.parse_args()
@@ -151,15 +153,9 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-
-    # Check if -d is specified for batch mode
-    if args.directory:
-        batch_concatenate_images(args.directory, args.output_directory, args.n,
-                                 args.extension, args.output, args.width)
-    else:
-        input_paths = expand_patterns(args.input_paths)
-        if not input_paths:
-            logger.error(
-                "No valid image files found based on the input patterns.")
-        else:
-            concatenate_images_vertically(input_paths, args.output, args.width)
+    input_paths = expand_patterns(args.input_paths, args.extension)
+    if not input_paths:
+        logger.error(
+            "No valid image files found based on the input.")
+    batch_concatenate_images(input_paths, args.output_path, args.n,
+                             args.extension, args.width)
