@@ -28,7 +28,7 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 
 
-def concatenate_images_vertically(image_paths, output_path):
+def concatenate_images_vertically(image_paths, output_path, width):
     images = []
     for image_path in image_paths:
         try:
@@ -44,15 +44,26 @@ def concatenate_images_vertically(image_paths, output_path):
         return
 
     widths, heights = zip(*(image.size for image in images))
-    total_height = sum(heights)
-    max_width = max(widths)
+    # If no width is provided, use the width of the first image
+    if not width:
+        width = widths[0]
+    total_height = sum(
+        int(height * (width / img_width)) for img_width, height in zip(
+            widths, heights))
 
-    new_image = Image.new('RGB', (max_width, total_height))
+    new_image = Image.new('RGB', (width, total_height))
 
     y_offset = 0
     for image in images:
-        new_image.paste(image, (0, y_offset))
-        y_offset += image.height
+        # Adjust each image's width while maintaining aspect ratio
+        aspect_ratio = image.height / image.width
+        resized_height = int(width * aspect_ratio)
+        resized_image = image.resize((width, resized_height),
+                                     Image.Resampling.LANCZOS)
+
+        # Paste the resized image onto the new_image canvas
+        new_image.paste(resized_image, (0, y_offset))
+        y_offset += resized_height
 
     try:
         new_image.save(output_path)
@@ -61,7 +72,8 @@ def concatenate_images_vertically(image_paths, output_path):
         logging.error("Could not save the concatenated image.")
 
 
-def batch_concatenate_images(directory, output_dir, n, ext, output_pattern):
+def batch_concatenate_images(directory, output_dir, n, ext, output_pattern,
+                             width):
     image_files = sorted(Path(directory).glob(f"*.{ext}"))
     if not image_files:
         logger.error(f"No images found with extension {ext} in {directory}.")
@@ -89,7 +101,7 @@ def batch_concatenate_images(directory, output_dir, n, ext, output_pattern):
         output_path = output_dir / output_filename
 
         # Concatenate and save the batch
-        concatenate_images_vertically(batch_files, output_path)
+        concatenate_images_vertically(batch_files, output_path, width)
 
 
 def expand_patterns(patterns):
@@ -131,6 +143,8 @@ def parse_args():
                         help="File extension for images in directory mode")
     parser.add_argument("-od", "--output_directory", default=r".\outputs",
                         help="Directory to save output images")
+    parser.add_argument("-w", "--width", type=int,
+                        help="Width of output images")
     return parser.parse_args()
 
 
@@ -140,11 +154,11 @@ if __name__ == "__main__":
     # Check if -d is specified for batch mode
     if args.directory:
         batch_concatenate_images(args.directory, args.output_directory, args.n,
-                                 args.extension, args.output)
+                                 args.extension, args.output, args.width)
     else:
         input_paths = expand_patterns(args.input_paths)
         if not input_paths:
             logger.error(
                 "No valid image files found based on the input patterns.")
         else:
-            concatenate_images_vertically(input_paths, args.output)
+            concatenate_images_vertically(input_paths, args.output, args.width)
