@@ -67,7 +67,8 @@ def concatenate_images_vertically(image_paths, output_path, width):
 
     try:
         new_image.save(output_path)
-        logging.info(f"Concatenated image saved to {output_path}")
+        abs_output_path = Path(output_path).resolve()
+        logging.info(f"Concatenated image saved to {abs_output_path}")
     except IOError:
         logging.error("Could not save the concatenated image.")
 
