@@ -36,12 +36,12 @@ def concatenate_images_vertically(image_paths, output_path, width):
             img = Image.open(image_path)
             images.append(img)
         except FileNotFoundError:
-            logging.error(f"File not found - {image_path}")
+            logger.error(f"File not found - {image_path}")
         except IOError:
-            logging.error(f"Could not open image file - {image_path}")
+            logger.error(f"Could not open image file - {image_path}")
 
     if not images:
-        logging.error("No valid images to concatenate.")
+        logger.error("No valid images to concatenate.")
         return
 
     widths, heights = zip(*(image.size for image in images))
@@ -69,22 +69,36 @@ def concatenate_images_vertically(image_paths, output_path, width):
     try:
         new_image.save(output_path)
         abs_output_path = Path(output_path).resolve()
-        logging.info(f"Concatenated image saved to {abs_output_path}")
+        logger.info(f"Concatenated image saved to {abs_output_path}")
     except IOError:
-        logging.error("Could not save the concatenated image.")
+        logger.error("Could not save the concatenated image.")
+    except KeyError as e:
+        logger.error(f"{e} is not a valid extension for output files.")
+    except ValueError as e:
+        if str(e) != "unknown file extension: ":
+            logger.error("U" + str(e)[1:])
+        logger.error("You must specify a valid file extension for the -o "
+                     "parameter, such as output.jpg")
 
 
-def handle_output_pattern(pattern, ext):
+def handle_output_pattern(pattern):
     if "\\" in pattern:
         output_dir = Path(pattern).parent
         output_dir.mkdir(parents=True, exist_ok=True)
-    if not pattern.endswith(f".{ext}"):
-        pattern += f".{ext}"
     return pattern
 
 
-def batch_concatenate_images(image_files, output_pattern, n, ext, width):
-    output_pattern = handle_output_pattern(output_pattern, ext)
+def add_brackets_to_output_pattern(output_pattern):
+    last_dot_index = output_pattern.rfind('.')
+    if last_dot_index != -1:
+        return output_pattern[:last_dot_index] + '[]' + output_pattern[
+                                                        last_dot_index:]
+    else:
+        return output_pattern + '[]'
+
+
+def batch_concatenate_images(image_files, output_pattern, n, width):
+    output_pattern = handle_output_pattern(output_pattern)
     while Path(output_pattern).exists() and Path(output_pattern).is_file():
         overwrite = Prompt.ask(f"{output_pattern} already exists, do you "
                                f"want to overwrite it?",
@@ -94,7 +108,7 @@ def batch_concatenate_images(image_files, output_pattern, n, ext, width):
             output_pattern = Prompt.ask(f"Please enter another output "
                                         f"filename",
                                         default=".\\outputs\\new_output")
-            output_pattern = handle_output_pattern(output_pattern, ext)
+            output_pattern = handle_output_pattern(output_pattern)
         else:
             break
 
@@ -104,7 +118,7 @@ def batch_concatenate_images(image_files, output_pattern, n, ext, width):
         concatenate_images_vertically(image_files, output_pattern, width)
     else:
         if "[]" not in output_pattern:
-            output_pattern = output_pattern.replace(f".{ext}", f"[].{ext}")
+            output_pattern = add_brackets_to_output_pattern(output_pattern)
         zero_padded_width = len(str(total_batches))
         for batch_idx in range(total_batches):
             batch_files = image_files[batch_idx * n:(batch_idx + 1) * n]
@@ -145,7 +159,9 @@ def expand_patterns(patterns, ext):
         elif path.is_file():
             unfolded_list.append(path)
         elif path.is_dir():
-            files = sorted(path.glob(f"*.{ext}"))
+            files = []
+            for ext_part in ext.split(','):
+                files.extend(sorted(path.glob(f"*.{ext_part.strip()}")))
             unfolded_list.extend(files)
 
     return unfolded_list
@@ -161,8 +177,8 @@ def parse_args():
                         help="Output image path or pattern")
     parser.add_argument("-n", type=int, default=6,
                         help="Number of images per batch")
-    parser.add_argument("-e", "--extension", default="jpg",
-                        help="File extension for images")
+    parser.add_argument("-e", "--extension", default="jpg,jpeg,png",
+                        help="File extension for input images")
     parser.add_argument("-w", "--width", type=int,
                         help="Width of output images")
     return parser.parse_args()
@@ -175,4 +191,4 @@ if not input_paths:
         "No valid image files found based on the input.")
 else:
     batch_concatenate_images(input_paths, args.output_path, args.n,
-                             args.extension, args.width)
+                             args.width)
