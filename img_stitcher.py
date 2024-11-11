@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PIL import Image
 from colorama import init, Fore
+from rich.prompt import Prompt
 
 init(autoreset=True)
 
@@ -73,13 +74,29 @@ def concatenate_images_vertically(image_paths, output_path, width):
         logging.error("Could not save the concatenated image.")
 
 
-def batch_concatenate_images(image_files, output_pattern, n, ext, width):
-    if "\\" in output_pattern:
-        output_dir = Path(output_pattern).parent
+def handle_output_pattern(pattern, ext):
+    if "\\" in pattern:
+        output_dir = Path(pattern).parent
         output_dir.mkdir(parents=True, exist_ok=True)
+    if not pattern.endswith(f".{ext}"):
+        pattern += f".{ext}"
+    return pattern
 
-    if not output_pattern.endswith(f".{ext}"):
-        output_pattern += f".{ext}"
+
+def batch_concatenate_images(image_files, output_pattern, n, ext, width):
+    output_pattern = handle_output_pattern(output_pattern, ext)
+    while Path(output_pattern).exists() and Path(output_pattern).is_file():
+        overwrite = Prompt.ask(f"{output_pattern} already exists, do you "
+                               f"want to overwrite it?",
+                               choices=["y", "n"],
+                               default="y")
+        if overwrite == "n":
+            output_pattern = Prompt.ask(f"Please enter another output "
+                                        f"filename",
+                                        default=".\\outputs\\new_output")
+            output_pattern = handle_output_pattern(output_pattern, ext)
+        else:
+            break
 
     total_batches = (len(image_files) + n - 1) // n
 
@@ -156,5 +173,6 @@ input_paths = expand_patterns(args.input_paths, args.extension)
 if not input_paths:
     logger.error(
         "No valid image files found based on the input.")
-batch_concatenate_images(input_paths, args.output_path, args.n,
-                         args.extension, args.width)
+else:
+    batch_concatenate_images(input_paths, args.output_path, args.n,
+                             args.extension, args.width)
