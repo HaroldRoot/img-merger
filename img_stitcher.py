@@ -60,7 +60,7 @@ def concatenate_images_vertically(image_paths, output_path, width):
         aspect_ratio = image.height / image.width
         resized_height = int(width * aspect_ratio)
         resized_image = image.resize((width, resized_height),
-                                     Image.Resampling.LANCZOS)
+                                     Image.Resampling.BICUBIC)
 
         # Paste the resized image onto the new_image canvas
         new_image.paste(resized_image, (0, y_offset))
