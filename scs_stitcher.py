@@ -32,7 +32,7 @@ def get_images_between(from_path, to_path):
     return [str(p) for p in images[start_index:end_index + 1]]
 
 
-def locate_subtitle(path, output_path="output.jpg", debug=True):
+def locate_subtitle(path, output_path, debug=False):
     # Load the image
     img_data = np.fromfile(path, dtype=np.uint8)
     img = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
@@ -107,7 +107,7 @@ def locate_subtitle(path, output_path="output.jpg", debug=True):
     # Crop the subtitle region
     result = img[start_y:end_y, 0:width]
     cv2.imwrite(output_path, result)
-    print(f"Subtitle region saved to {output_path} "
+    print(f"Subtitle region saved to {Path(output_path).resolve()} "
           f"(start_y={start_y}, end_y={end_y}).")
 
 
@@ -116,6 +116,8 @@ def parse_args():
         description="Concatenate screenshots vertically.")
     parser.add_argument('input_paths', nargs='*',
                         help="Input image paths or patterns")
+    parser.add_argument('-o', '--output_path', default='output.jpg',
+                        help="Output image path or pattern")
     parser.add_argument('--compare', nargs=2,
                         metavar=('image_path1', 'image_path2'),
                         help='Compare the similarity of two images, and the '
@@ -133,6 +135,8 @@ def parse_args():
     parser.add_argument('--locsub',
                         help='Locate and extract the subtitle part of the '
                              'image.')
+    parser.add_argument('-v', '--debug', '--verbose', action='store_true',
+                        help='Enable debug mode for detailed logs.')
     return parser.parse_args()
 
 
@@ -169,4 +173,4 @@ elif args.cluster:
 
     print(clusters)
 elif args.locsub:
-    locate_subtitle(args.locsub)
+    locate_subtitle(args.locsub, output_path=args.output_path, debug=args.debug)
