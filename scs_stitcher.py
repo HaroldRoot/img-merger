@@ -1,7 +1,11 @@
 import argparse
+from collections import Counter
 from pathlib import Path
 
+import cv2
 import imagehash
+import numpy as np
+import pytesseract
 from PIL import Image
 
 
@@ -28,6 +32,85 @@ def get_images_between(from_path, to_path):
     return [str(p) for p in images[start_index:end_index + 1]]
 
 
+def locate_subtitle(path, output_path="output.jpg", debug=True):
+    # Load the image
+    img_data = np.fromfile(path, dtype=np.uint8)
+    img = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
+
+    height, width, _ = img.shape
+
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Perform OCR using Tesseract
+    custom_config = r'--oem 3 --psm 6 -l chi_sim'  # Use Chinese language pack
+    data = pytesseract.image_to_data(gray, config=custom_config,
+                                     output_type=pytesseract.Output.DICT)
+
+    # Output debug information
+    if debug:
+        print("OCR Detection Results:")
+        for i in range(len(data['text'])):
+            if data['text'][i].strip():
+                print(f"Text: {data['text'][i]}, "
+                      f"Position: ({data['left'][i]}, {data['top'][i]}) -> "
+                      f"({data['width'][i]}, {data['height'][i]})")
+
+    # Collect y-coordinates and heights of all valid text boxes
+    y_positions = []
+    heights = []
+    for i in range(len(data['text'])):
+        text = data['text'][i].strip()
+        if text:  # If valid text is detected
+            y_positions.append(int(data['top'][i]))
+            heights.append(int(data['height'][i]))
+
+    # If no valid text boxes are found, attempt edge-based detection
+    if not y_positions:
+        if debug:
+            print("No OCR-based subtitle candidates found. "
+                  "Attempting edge-based detection.")
+        edges = cv2.Canny(gray, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_SIMPLE)
+
+        min_y = height
+        for contour in contours:
+            x, y, w, h = cv2.boundingRect(contour)
+            aspect_ratio = w / h
+            # Assume subtitles are horizontal strips
+            if y > height * 0.5 and 3 < aspect_ratio < 100:
+                min_y = min(min_y, y)
+        if min_y < height:
+            result = img[min_y:height, 0:width]
+            cv2.imwrite(output_path, result)
+            print(f"Subtitle region saved to {output_path} "
+                  f"(fallback detection, start_y={min_y}).")
+        else:
+            print("No subtitle found.")
+        return
+
+    # Determine the cropping region
+    # based on the mode of y-coordinates and heights
+    y_counter = Counter(y_positions)
+    height_counter = Counter(heights)
+
+    start_y = max(y_counter, key=y_counter.get)  # Mode of y-coordinates
+    subtitle_height = max(height_counter,
+                          key=height_counter.get)  # Mode of heights
+
+    # Prevent cropping beyond image bounds
+    start_y = max(0, start_y)
+    # Allow slight extension for multi-line subtitles
+    end_y = min(height, start_y + subtitle_height * 2)
+
+    # Crop the subtitle region
+    result = img[start_y:end_y, 0:width]
+    cv2.imwrite(output_path, result)
+    print(f"Subtitle region saved to {output_path} "
+          f"(start_y={start_y}, end_y={end_y}).")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Concatenate screenshots vertically.")
@@ -47,6 +130,9 @@ def parse_args():
                              'directory.')
     parser.add_argument('--to', dest='to_path',
                         help='Ending path for selecting images in a directory.')
+    parser.add_argument('--locsub',
+                        help='Locate and extract the subtitle part of the '
+                             'image.')
     return parser.parse_args()
 
 
@@ -82,3 +168,5 @@ elif args.cluster:
             clusters.append([reference_image])
 
     print(clusters)
+elif args.locsub:
+    locate_subtitle(args.locsub)
