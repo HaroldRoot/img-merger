@@ -52,7 +52,7 @@ def get_images_between(from_path, to_path):
     return [str(p) for p in images[start_index:end_index + 1]]
 
 
-def locate_subtitle(path, output_path, debug=False):
+def locate_subtitle(path, output_path='output.jpg', debug=False):
     # Load the image
     img_data = np.fromfile(path, dtype=np.uint8)
     img = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
@@ -124,11 +124,56 @@ def locate_subtitle(path, output_path, debug=False):
     # Allow slight extension for multi-line subtitles
     end_y = min(height, start_y + subtitle_height * 2)
 
-    # Crop the subtitle region
-    result = img[start_y:end_y, 0:width]
-    cv2.imwrite(output_path, result)
-    print(f"Subtitle region saved to {Path(output_path).resolve()} "
-          f"(start_y={start_y}, end_y={end_y}).")
+    if debug:
+        # Crop the subtitle region
+        result = img[start_y:end_y, 0:width]
+        cv2.imwrite(output_path, result)
+        print(f"Subtitle region saved to {Path(output_path).resolve()} "
+              f"(start_y={start_y}, end_y={end_y}).")
+
+    return start_y, end_y
+
+
+def concatenate_screenshots(image_paths, output_path, threshold, debug=False):
+    clusters = cluster_images(image_paths, threshold)
+    results = []
+
+    for i, cluster in enumerate(clusters):
+        if len(cluster) == 1:
+            # If there is only one image in the cluster, save it directly
+            img = cv2.imdecode(np.fromfile(cluster[0], dtype=np.uint8),
+                               cv2.IMREAD_COLOR)
+            output_file = Path(output_path).parent / f"cluster_{i + 1}.jpg"
+            cv2.imwrite(str(output_file), img)
+            results.append(str(output_file))
+            continue
+
+        # Get the full image region from the first image in the cluster
+        base_image_path = cluster[0]
+        base_image = cv2.imdecode(np.fromfile(base_image_path, dtype=np.uint8),
+                                  cv2.IMREAD_COLOR)
+
+        # Extract and stack subtitle regions from other images in the cluster
+        subtitle_images = []
+        for img_path in cluster[1:]:
+            subtitle_coords = locate_subtitle(img_path, debug=debug)
+            if subtitle_coords:
+                start_y, end_y = subtitle_coords
+                subtitle_img = cv2.imdecode(
+                    np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+                subtitle_images.append(subtitle_img[start_y:end_y, :])
+
+        # Combine the main image with the subtitle regions
+        result_img = base_image
+        for sub_img in subtitle_images:
+            result_img = np.vstack((result_img, sub_img))
+
+        # Save the result
+        output_file = Path(output_path).parent / f"cluster_{i + 1}.jpg"
+        cv2.imwrite(str(output_file), result_img)
+        results.append(str(output_file))
+
+    return results
 
 
 def parse_args():
@@ -155,8 +200,8 @@ def parse_args():
     parser.add_argument('--locsub',
                         help='Locate and extract the subtitle part of the '
                              'image.')
-    parser.add_argument('-v', '--debug', '--verbose', action='store_true',
-                        help='Enable debug mode for detailed logs.')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enable debug mode.')
     return parser.parse_args()
 
 
@@ -173,4 +218,8 @@ if args.compare:
 elif args.cluster:
     print(cluster_images(input_paths, threshold=args.threshold))
 elif args.locsub:
-    locate_subtitle(args.locsub, output_path=args.output_path, debug=args.debug)
+    locate_subtitle(args.locsub, output_path=args.output_path, debug=True)
+elif not input_paths:
+    print("No valid image files found based on the input.")
+else:
+    concatenate_screenshots(input_paths, args.output_path, args.threshold)
