@@ -17,8 +17,28 @@ def calculate_image_similarity(paths):
     hash2 = imagehash.average_hash(image2)
 
     result = 1 - (hash1 - hash2) / len(hash1.hash) ** 2
-    print(f"The similarity of the two images is: {result}")
     return result
+
+
+def cluster_images(image_paths, threshold):
+    clusters = []
+    reference_image = None
+
+    for image_path in image_paths:
+        if reference_image is None:
+            reference_image = image_path
+            clusters.append([reference_image])
+            continue
+
+        similarity = calculate_image_similarity(
+            [Path(reference_image), Path(image_path)])
+        if similarity >= threshold:
+            clusters[-1].append(image_path)
+        else:
+            reference_image = image_path
+            clusters.append([reference_image])
+
+    return clusters
 
 
 def get_images_between(from_path, to_path):
@@ -142,32 +162,15 @@ def parse_args():
 
 args = parse_args()
 
+if args.from_path and args.to_path:
+    input_paths = get_images_between(args.from_path, args.to_path)
+else:
+    input_paths = args.input_paths
+
 if args.compare:
-    similarity = calculate_image_similarity(args.compare)
+    print(f"The similarity of the two images is: "
+          f"{calculate_image_similarity(args.compare)}")
 elif args.cluster:
-    clusters = []
-    reference_image = None
-    threshold = args.threshold
-
-    if args.from_path and args.to_path:
-        input_paths = get_images_between(args.from_path, args.to_path)
-    else:
-        input_paths = args.input_paths
-
-    for image_path in input_paths:
-        if reference_image is None:
-            reference_image = image_path
-            clusters.append([reference_image])
-            continue
-
-        similarity = calculate_image_similarity(
-            [Path(reference_image), Path(image_path)])
-        if similarity >= threshold:
-            clusters[-1].append(image_path)
-        else:
-            reference_image = image_path
-            clusters.append([reference_image])
-
-    print(clusters)
+    print(cluster_images(input_paths, threshold=args.threshold))
 elif args.locsub:
     locate_subtitle(args.locsub, output_path=args.output_path, debug=args.debug)
