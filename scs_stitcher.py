@@ -9,15 +9,15 @@ import pytesseract
 from PIL import Image
 
 
-def calculate_image_similarity(path1, path2):
-    image1 = Image.open(path1)
-    image2 = Image.open(path2)
+def calculate_image_similarity(paths):
+    image1 = Image.open(Path(paths[0]))
+    image2 = Image.open(Path(paths[1]))
 
     hash1 = imagehash.average_hash(image1)
     hash2 = imagehash.average_hash(image2)
 
     result = 1 - (hash1 - hash2) / len(hash1.hash) ** 2
-
+    print(f"The similarity of the two images is: {result}")
     return result
 
 
@@ -143,10 +143,7 @@ def parse_args():
 args = parse_args()
 
 if args.compare:
-    image_path1 = Path(args.compare[0])
-    image_path2 = Path(args.compare[1])
-    similarity = calculate_image_similarity(image_path1, image_path2)
-    print(f"The similarity of the two images is: {similarity}")
+    similarity = calculate_image_similarity(args.compare)
 elif args.cluster:
     clusters = []
     reference_image = None
@@ -163,8 +160,8 @@ elif args.cluster:
             clusters.append([reference_image])
             continue
 
-        similarity = calculate_image_similarity(Path(reference_image),
-                                                Path(image_path))
+        similarity = calculate_image_similarity(
+            [Path(reference_image), Path(image_path)])
         if similarity >= threshold:
             clusters[-1].append(image_path)
         else:
