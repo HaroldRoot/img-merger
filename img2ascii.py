@@ -16,7 +16,7 @@ def calculate_brightness_average(pixel):
     return sum(pixel[:3]) // 3
 
 
-def calculate_brightness_lightness(pixel):
+def calculate_brightness_min_max(pixel):
     return (max(pixel) + min(pixel)) // 2
 
 
@@ -133,9 +133,9 @@ def parse_args():
     parser.add_argument("-o", "--output", type=str,
                         help="Path to save ASCII art to a file.")
     parser.add_argument("-b", "--brightness",
-                        choices=["average", "lightness", "luminosity"],
+                        choices=["average", "min_max", "luminosity"],
                         default="luminosity",
-                        help="Brightness calculation method "
+                        help="Brightness mapping method "
                              "(default: luminosity).")
     parser.add_argument("-k", "--kmeans", action="store_true",
                         help="Use K-means clustering to generate ASCII art.")
@@ -152,7 +152,7 @@ if __name__ == "__main__":
         logger.setLevel("ERROR")
 
     brightness_methods = {"average": calculate_brightness_average,
-                          "lightness": calculate_brightness_lightness,
+                          "min_max": calculate_brightness_min_max,
                           "luminosity": calculate_brightness_luminosity}
 
     brightness_method = brightness_methods[args.brightness]
