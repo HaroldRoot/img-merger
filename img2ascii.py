@@ -102,6 +102,60 @@ def map_brightness_to_ascii(luminosity_values):
     return ascii_art
 
 
+def get_dominant_color(pixel):
+    r, g, b, *_ = pixel
+
+    # Determine which color is dominant
+    if r > g and r > b:  # Red is dominant
+        return Fore.RED
+    elif g > r and g > b:  # Green is dominant
+        return Fore.GREEN
+    elif b > r and b > g:  # Blue is dominant
+        return Fore.BLUE
+    elif r > b and g > b:  # Yellow is dominant
+        return Fore.YELLOW
+    elif r > g and b > g:  # Magenta is dominant
+        return Fore.MAGENTA
+    elif g > r and b > r:  # Cyan is dominant
+        return Fore.CYAN
+    else:
+        return None  # No strong dominant color
+
+
+def map_brightness_to_ascii_with_color(luminosity_values, pixel_data):
+    ascii_art = []
+    scale = len(characters) - 1
+    for row_idx, row in enumerate(luminosity_values):
+        row_art = ""
+        for col_idx, lum in enumerate(row):
+            # Get the dominant color for the pixel
+            pixel = pixel_data[row_idx][col_idx]
+            dominant_color = get_dominant_color(pixel)
+
+            # If there's a dominant color, use that for the printout
+            if dominant_color:
+                c = characters[
+                    round((lum / 255) * scale)]
+                row_art += dominant_color + c + c
+            else:
+                # For grayscale, use the calculated brightness for the ASCII
+                # character
+                c = characters[round((lum / 255) * scale)]
+                row_art += Fore.WHITE + c + c
+        ascii_art.append(row_art)
+
+    return ascii_art
+
+
+def img2ascii_colorful(img, width, height):
+    pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
+                  range(height)]
+    luminosity_values = generate_luminosity_values(pixel_data)
+    ascii_art = map_brightness_to_ascii_with_color(luminosity_values,
+                                                   pixel_data)
+    return "\n".join(ascii_art)
+
+
 def img2ascii_brightness(img, width, height, invert=False):
     pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
                   range(height)]
@@ -111,7 +165,8 @@ def img2ascii_brightness(img, width, height, invert=False):
 
 
 # Generate ASCII art from an image
-def generate_ascii_art(max_width, max_height, kmeans=False, invert=False):
+def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
+                       colorful=False):
     try:
         with Image.open(image_path) as img:
             original_width, original_height = img.size
@@ -125,6 +180,8 @@ def generate_ascii_art(max_width, max_height, kmeans=False, invert=False):
             if kmeans:
                 frame = np.array(img)
                 return img2ascii_kmeans(frame, K=5)
+            if colorful:
+                return img2ascii_colorful(img, width, height)
             else:
                 return img2ascii_brightness(img, width, height, invert)
 
@@ -159,6 +216,8 @@ def parse_args():
                         choices=["red", "green", "yellow", "blue", "magenta",
                                  "cyan", "white"], default="white",
                         help="Color for the ASCII output (default: white).")
+    parser.add_argument("-f", "--colorful", action="store_true",
+                        help="Enable colorful ASCII art.")
     parser.add_argument("-i", "--invert", action="store_true",
                         help="Invert brightness values (dark becomes light "
                              "and vice versa).")
@@ -185,7 +244,8 @@ if __name__ == "__main__":
     for image_path in args.input_paths:
         ascii_output = generate_ascii_art(args.width, args.height,
                                           kmeans=args.kmeans,
-                                          invert=args.invert)
+                                          invert=args.invert,
+                                          colorful=args.colorful)
 
         if ascii_output:
             color = color_map[args.color]
