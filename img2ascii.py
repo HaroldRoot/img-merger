@@ -52,11 +52,12 @@ def img2ascii_kmeans(frame, K=5):
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     frame_array = np.float32(frame_gray.reshape(-1))
 
+    bestLabels = np.zeros((frame_array.shape[0], 1), dtype=np.int32)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     flags = cv2.KMEANS_RANDOM_CENTERS
 
-    compactness, labels, centroids = cv2.kmeans(frame_array, K, None, criteria,
-                                                10, flags)
+    compactness, labels, centroids = cv2.kmeans(frame_array, K, bestLabels,
+                                                criteria, 10, flags)
     centroids = np.uint8(centroids)
 
     centroids_sorted = sorted(centroids.flatten())
