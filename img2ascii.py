@@ -4,8 +4,11 @@ import random
 import cv2
 import numpy as np
 from PIL import Image, UnidentifiedImageError
+from colorama import init, Fore
 
 from custom_logger import logger
+
+init(autoreset=True)
 
 characters = ("`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8"
               "%B@$")
@@ -141,8 +144,16 @@ def parse_args():
                         help="Use K-means clustering to generate ASCII art.")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="Suppress informational output.")
+    parser.add_argument("-c", "--color",
+                        choices=["red", "green", "yellow", "blue", "magenta",
+                                 "cyan", "white"], default="white",
+                        help="Color for the ASCII output (default: white).")
     return parser.parse_args()
 
+
+color_map = {"red": Fore.RED, "green": Fore.GREEN, "yellow": Fore.YELLOW,
+             "blue": Fore.BLUE, "magenta": Fore.MAGENTA, "cyan": Fore.CYAN,
+             "white": Fore.WHITE}
 
 if __name__ == "__main__":
     args = parse_args()
@@ -162,9 +173,12 @@ if __name__ == "__main__":
                                           kmeans=args.kmeans)
 
         if ascii_output:
+            color = color_map[args.color]
+            colored_output = color + ascii_output
+
             if args.output:
                 with open(args.output, "w") as f:
                     f.write(ascii_output)
                 logger.info(f"Saved ASCII art to {args.output}")
             else:
-                print(ascii_output)
+                print(colored_output)
