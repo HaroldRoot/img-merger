@@ -7,6 +7,9 @@ from PIL import Image, UnidentifiedImageError
 
 from custom_logger import logger
 
+characters = ("`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8"
+              "%B@$")
+
 
 # Brightness calculation methods
 def calculate_brightness_average(pixel):
@@ -75,7 +78,7 @@ def img2ascii_kmeans(frame, K=5):
 
 
 # Convert brightness values to ASCII characters
-def map_brightness_to_ascii(luminosity_values, characters):
+def map_brightness_to_ascii(luminosity_values):
     ascii_art = []
     scale = len(characters) - 1
     for row in luminosity_values:
@@ -86,7 +89,7 @@ def map_brightness_to_ascii(luminosity_values, characters):
 
 # Generate ASCII art from an image
 def generate_ascii_art(image_path, max_width, max_height, brightness_method,
-                       characters, kmeans=False):
+                       kmeans=False):
     try:
         with Image.open(image_path) as img:
             original_width, original_height = img.size
@@ -106,11 +109,9 @@ def generate_ascii_art(image_path, max_width, max_height, brightness_method,
                               in range(height)]
                 luminosity_values = generate_luminosity_values(pixel_data,
                                                                brightness_method)
-                ascii_art = map_brightness_to_ascii(luminosity_values,
-                                                    characters)
-                ascii_output = "\n".join(
+                ascii_art = map_brightness_to_ascii(luminosity_values)
+                return "\n".join(
                     ["".join(char * 2 for char in row) for row in ascii_art])
-                return ascii_output
 
     except FileNotFoundError:
         logger.error(f"Image file not found: {image_path}")
@@ -154,14 +155,11 @@ if __name__ == "__main__":
                           "lightness": calculate_brightness_lightness,
                           "luminosity": calculate_brightness_luminosity}
 
-    characters = ("`^\",:;Il!i~+_-?][}{1)("
-                  "|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$")
     brightness_method = brightness_methods[args.brightness]
 
     for image_path in args.input_paths:
         ascii_output = generate_ascii_art(image_path, args.width, args.height,
-                                          brightness_method, characters,
-                                          kmeans=args.kmeans)
+                                          brightness_method, kmeans=args.kmeans)
 
         if ascii_output:
             if args.output:
