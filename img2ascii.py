@@ -125,10 +125,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Convert image to ASCII art.")
     parser.add_argument("input_paths", nargs="+",
                         help="Paths to input image files.")
-    parser.add_argument("-W", "--width", type=int, default=160,
-                        help="Max width of output (default: 160).")
-    parser.add_argument("-H", "--height", type=int, default=90,
-                        help="Max height of output (default: 90).")
+    parser.add_argument("-W", "--width", type=int, default=470,
+                        help="Max width of output (default: 470).")
+    parser.add_argument("-H", "--height", type=int, default=235,
+                        help="Max height of output (default: 235).")
     parser.add_argument("-o", "--output", type=str,
                         help="Path to save ASCII art to a file.")
     parser.add_argument("-b", "--brightness",
