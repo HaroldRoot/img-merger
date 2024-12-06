@@ -27,9 +27,20 @@ def calculate_brightness_luminosity(pixel):
     return int(0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2])
 
 
-# Convert pixel data to brightness values
-def generate_luminosity_values(pixel_data):
-    return [[brightness_method(pixel) for pixel in row] for row in pixel_data]
+def invert_brightness(brightness):
+    return 255 - brightness
+
+
+# Convert pixel data to brightness values, with optional inversion
+def generate_luminosity_values(pixel_data, invert=False):
+    luminosity_values = [[brightness_method(pixel) for pixel in row] for row in
+                         pixel_data]
+
+    if invert:
+        luminosity_values = [[invert_brightness(lum) for lum in row] for row in
+                             luminosity_values]
+
+    return luminosity_values
 
 
 # K-means clustering method
@@ -90,16 +101,16 @@ def map_brightness_to_ascii(luminosity_values):
     return ascii_art
 
 
-def img2ascii_brightness(img, width, height):
+def img2ascii_brightness(img, width, height, invert=False):
     pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
                   range(height)]
-    luminosity_values = generate_luminosity_values(pixel_data)
+    luminosity_values = generate_luminosity_values(pixel_data, invert)
     ascii_art = map_brightness_to_ascii(luminosity_values)
     return "\n".join(["".join(char * 2 for char in row) for row in ascii_art])
 
 
 # Generate ASCII art from an image
-def generate_ascii_art(max_width, max_height, kmeans=False):
+def generate_ascii_art(max_width, max_height, kmeans=False, invert=False):
     try:
         with Image.open(image_path) as img:
             original_width, original_height = img.size
@@ -114,7 +125,7 @@ def generate_ascii_art(max_width, max_height, kmeans=False):
                 frame = np.array(img)
                 return img2ascii_kmeans(frame, K=5)
             else:
-                return img2ascii_brightness(img, width, height)
+                return img2ascii_brightness(img, width, height, invert)
 
     except FileNotFoundError:
         logger.error(f"Image file not found: {image_path}")
@@ -137,9 +148,8 @@ def parse_args():
                         help="Path to save ASCII art to a file.")
     parser.add_argument("-b", "--brightness",
                         choices=["average", "min_max", "luminosity"],
-                        default="luminosity",
-                        help="Brightness mapping method "
-                             "(default: luminosity).")
+                        default="luminosity", help="Brightness mapping method "
+                                                   "(default: luminosity).")
     parser.add_argument("-k", "--kmeans", action="store_true",
                         help="Use K-means clustering to generate ASCII art.")
     parser.add_argument("-q", "--quiet", action="store_true",
@@ -148,6 +158,9 @@ def parse_args():
                         choices=["red", "green", "yellow", "blue", "magenta",
                                  "cyan", "white"], default="white",
                         help="Color for the ASCII output (default: white).")
+    parser.add_argument("-i", "--invert", action="store_true",
+                        help="Invert brightness values (dark becomes light "
+                             "and vice versa).")
     return parser.parse_args()
 
 
@@ -170,7 +183,8 @@ if __name__ == "__main__":
 
     for image_path in args.input_paths:
         ascii_output = generate_ascii_art(args.width, args.height,
-                                          kmeans=args.kmeans)
+                                          kmeans=args.kmeans,
+                                          invert=args.invert)
 
         if ascii_output:
             color = color_map[args.color]
