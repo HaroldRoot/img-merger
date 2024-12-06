@@ -13,7 +13,7 @@ characters = ("`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8"
 
 # Brightness calculation methods
 def calculate_brightness_average(pixel):
-    return sum(pixel) // 3
+    return sum(pixel[:3]) // 3
 
 
 def calculate_brightness_lightness(pixel):
