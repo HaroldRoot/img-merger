@@ -25,7 +25,7 @@ def calculate_brightness_luminosity(pixel):
 
 
 # Convert pixel data to brightness values
-def generate_luminosity_values(pixel_data, brightness_method):
+def generate_luminosity_values(pixel_data):
     return [[brightness_method(pixel) for pixel in row] for row in pixel_data]
 
 
@@ -87,31 +87,31 @@ def map_brightness_to_ascii(luminosity_values):
     return ascii_art
 
 
+def img2ascii_brightness(img, width, height):
+    pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
+                  range(height)]
+    luminosity_values = generate_luminosity_values(pixel_data)
+    ascii_art = map_brightness_to_ascii(luminosity_values)
+    return "\n".join(["".join(char * 2 for char in row) for row in ascii_art])
+
+
 # Generate ASCII art from an image
-def generate_ascii_art(image_path, max_width, max_height, brightness_method,
-                       kmeans=False):
+def generate_ascii_art(max_width, max_height, kmeans=False):
     try:
         with Image.open(image_path) as img:
             original_width, original_height = img.size
             logger.info(f"Loaded image: {image_path} "
                         f"({original_width}x{original_height})")
 
-            # Resize the image
             img.thumbnail((max_width, max_height))
             width, height = img.size
             logger.info(f"Resized image to: {width}x{height}")
 
             if kmeans:
-                img_array = np.array(img)
-                return img2ascii_kmeans(img_array, K=5)
+                frame = np.array(img)
+                return img2ascii_kmeans(frame, K=5)
             else:
-                pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y
-                              in range(height)]
-                luminosity_values = generate_luminosity_values(pixel_data,
-                                                               brightness_method)
-                ascii_art = map_brightness_to_ascii(luminosity_values)
-                return "\n".join(
-                    ["".join(char * 2 for char in row) for row in ascii_art])
+                return img2ascii_brightness(img, width, height)
 
     except FileNotFoundError:
         logger.error(f"Image file not found: {image_path}")
@@ -158,8 +158,8 @@ if __name__ == "__main__":
     brightness_method = brightness_methods[args.brightness]
 
     for image_path in args.input_paths:
-        ascii_output = generate_ascii_art(image_path, args.width, args.height,
-                                          brightness_method, kmeans=args.kmeans)
+        ascii_output = generate_ascii_art(args.width, args.height,
+                                          kmeans=args.kmeans)
 
         if ascii_output:
             if args.output:
