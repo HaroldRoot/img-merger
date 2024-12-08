@@ -1,10 +1,12 @@
 import argparse
+import math
 import random
 
 import cv2
 import numpy as np
 from PIL import Image, UnidentifiedImageError
-from colorama import init, Fore
+from colorama import Fore
+from colorama import init
 
 from custom_logger import logger
 
@@ -102,24 +104,28 @@ def map_brightness_to_ascii(luminosity_values):
     return ascii_art
 
 
-def get_dominant_color(pixel):
-    r, g, b, *_ = pixel
+COLOR_MAP = {
+    # Fore.BLACK: (0, 0, 0),
+    Fore.RED: (255, 0, 0),
+    Fore.GREEN: (0, 255, 0),
+    Fore.YELLOW: (255, 255, 0),
+    Fore.BLUE: (0, 0, 255),
+    Fore.MAGENTA: (255, 0, 255),
+    Fore.CYAN: (0, 255, 255),
+    Fore.WHITE: (255, 255, 255)
+}
 
-    # Determine which color is dominant
-    if r > g and r > b:  # Red is dominant
-        return Fore.RED
-    elif g > r and g > b:  # Green is dominant
-        return Fore.GREEN
-    elif b > r and b > g:  # Blue is dominant
-        return Fore.BLUE
-    elif r > b and g > b:  # Yellow is dominant
-        return Fore.YELLOW
-    elif r > g and b > g:  # Magenta is dominant
-        return Fore.MAGENTA
-    elif g > r and b > r:  # Cyan is dominant
-        return Fore.CYAN
-    else:
-        return None  # No strong dominant color
+
+def euclidean_distance(color1, color2):
+    return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
+
+
+def get_dominant_color(pixel):
+    pixel_color = pixel[:3]
+    distances = {color: euclidean_distance(pixel_color, ref_color) for
+                 color, ref_color in COLOR_MAP.items()}
+    dominant_color = min(distances, key=distances.get)
+    return dominant_color
 
 
 def map_brightness_to_ascii_with_color(luminosity_values, pixel_data):
@@ -134,8 +140,7 @@ def map_brightness_to_ascii_with_color(luminosity_values, pixel_data):
 
             # If there's a dominant color, use that for the printout
             if dominant_color:
-                c = characters[
-                    round((lum / 255) * scale)]
+                c = characters[round((lum / 255) * scale)]
                 row_art += dominant_color + c + c
             else:
                 # For grayscale, use the calculated brightness for the ASCII
