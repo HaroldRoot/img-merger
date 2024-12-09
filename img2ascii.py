@@ -94,16 +94,6 @@ def img2ascii_kmeans(frame, K=5):
     return "\n".join(["".join(char * 2 for char in row) for row in ascii_art])
 
 
-# Convert brightness values to ASCII characters
-def map_brightness_to_ascii(luminosity_values):
-    ascii_art = []
-    scale = len(characters) - 1
-    for row in luminosity_values:
-        ascii_art.append(
-            [characters[round((lum / 255) * scale)] for lum in row])
-    return ascii_art
-
-
 COLOR_MAP = {
     # Fore.BLACK: (0, 0, 0),
     Fore.RED: (255, 0, 0),
@@ -128,45 +118,44 @@ def get_dominant_color(pixel):
     return dominant_color
 
 
-def map_brightness_to_ascii_with_color(luminosity_values, pixel_data):
+def map_brightness_to_ascii(luminosity_values, pixel_data, colorful=False):
     ascii_art = []
     scale = len(characters) - 1
-    for row_idx, row in enumerate(luminosity_values):
-        row_art = ""
-        for col_idx, lum in enumerate(row):
-            # Get the dominant color for the pixel
-            pixel = pixel_data[row_idx][col_idx]
-            dominant_color = get_dominant_color(pixel)
+    if colorful:
+        for row_idx, row in enumerate(luminosity_values):
+            row_art = ""
+            for col_idx, lum in enumerate(row):
+                # Get the dominant color for the pixel
+                pixel = pixel_data[row_idx][col_idx]
+                dominant_color = get_dominant_color(pixel)
 
-            # If there's a dominant color, use that for the printout
-            if dominant_color:
-                c = characters[round((lum / 255) * scale)]
-                row_art += dominant_color + c + c
-            else:
-                # For grayscale, use the calculated brightness for the ASCII
-                # character
-                c = characters[round((lum / 255) * scale)]
-                row_art += Fore.WHITE + c + c
-        ascii_art.append(row_art)
+                # If there's a dominant color, use that for the printout
+                if dominant_color:
+                    c = characters[round((lum / 255) * scale)]
+                    row_art += dominant_color + c + c
+                else:
+                    # For grayscale, use the calculated brightness for the ASCII
+                    # character
+                    c = characters[round((lum / 255) * scale)]
+                    row_art += Fore.WHITE + c + c
+            ascii_art.append(row_art)
+        ascii_art = "\n".join(ascii_art)
+    else:
+        for row in luminosity_values:
+            ascii_art.append(
+                [characters[round((lum / 255) * scale)] for lum in row])
+        ascii_art = "\n".join(["".join(char * 2 for char in row) for row in
+                               ascii_art])
 
     return ascii_art
 
 
-def img2ascii_colorful(img, width, height):
-    pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
-                  range(height)]
-    luminosity_values = generate_luminosity_values(pixel_data)
-    ascii_art = map_brightness_to_ascii_with_color(luminosity_values,
-                                                   pixel_data)
-    return "\n".join(ascii_art)
-
-
-def img2ascii_brightness(img, width, height, invert=False):
+def img2ascii_brightness(img, width, height, invert=False, colorful=False):
     pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
                   range(height)]
     luminosity_values = generate_luminosity_values(pixel_data, invert)
-    ascii_art = map_brightness_to_ascii(luminosity_values)
-    return "\n".join(["".join(char * 2 for char in row) for row in ascii_art])
+    ascii_art = map_brightness_to_ascii(luminosity_values, pixel_data, colorful)
+    return ascii_art
 
 
 # Generate ASCII art from an image
@@ -185,10 +174,9 @@ def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
             if kmeans:
                 frame = np.array(img)
                 return img2ascii_kmeans(frame, K=5)
-            if colorful:
-                return img2ascii_colorful(img, width, height)
             else:
-                return img2ascii_brightness(img, width, height, invert)
+                return img2ascii_brightness(img, width, height, invert,
+                                            colorful)
 
     except FileNotFoundError:
         logger.error(f"Image file not found: {image_path}")
