@@ -167,9 +167,32 @@ def img2ascii_brightness(img, width, height, invert=False, colorful=False):
     return ascii_art
 
 
+def pixel_data_to_ascii_art(pixel_data):
+    scale = len(characters) - 1
+
+    ascii_art = "\n".join(
+        "".join(
+            f"{Fore.RED}{characters[round((r / 255) * scale)]}"
+            f"{Fore.GREEN}{characters[round((g / 255) * scale)]}"
+            f"{Fore.BLUE}{characters[round((b / 255) * scale)]}{Fore.RESET}"
+            for r, g, b in row
+        )
+        for row in pixel_data
+    )
+    return ascii_art
+
+
+def img2ascii_test(img, width, height):
+    pixel_data = [
+        [img.getpixel((x, y)) for x in range(width)]
+        for y in range(height)
+    ]
+    return pixel_data_to_ascii_art(pixel_data)
+
+
 # Generate ASCII art from an image
 def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
-                       colorful=False, K=5):
+                       colorful=False, K=5, test=False):
     try:
         with Image.open(image_path) as img:
             original_width, original_height = img.size
@@ -183,6 +206,8 @@ def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
             if kmeans:
                 frame = np.array(img)
                 return img2ascii_kmeans(frame, K, colorful)
+            elif test:
+                return img2ascii_test(img, width, height)
             else:
                 return img2ascii_brightness(img, width, height, invert,
                                             colorful)
@@ -200,9 +225,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Convert image to ASCII art.")
     parser.add_argument("input_paths", nargs="+",
                         help="Paths to input image files.")
-    parser.add_argument("-W", "--width", type=int, default=470,
+    parser.add_argument("-W", "--width", type=int, default=940,
                         help="Max width of output (default: 470).")
-    parser.add_argument("-H", "--height", type=int, default=235,
+    parser.add_argument("-H", "--height", type=int, default=470,
                         help="Max height of output (default: 235).")
     parser.add_argument("-o", "--output", type=str,
                         help="Path to save ASCII art to a file.")
@@ -223,6 +248,9 @@ def parse_args():
     parser.add_argument("-i", "--invert", action="store_true",
                         help="Invert brightness values (dark becomes light "
                              "and vice versa).")
+    parser.add_argument("--test", action="store_true",
+                        help="This is a temporary option set to test new "
+                             "features.")
     return parser.parse_args()
 
 
@@ -247,7 +275,8 @@ if __name__ == "__main__":
         ascii_output = generate_ascii_art(args.width, args.height,
                                           kmeans=args.kmeans,
                                           invert=args.invert,
-                                          colorful=args.colorful)
+                                          colorful=args.colorful,
+                                          test=args.test)
 
         if ascii_output:
             color = color_map[args.color]
