@@ -58,6 +58,8 @@ COLOR_MAP = {
 
 
 def euclidean_distance(color1, color2):
+    color1 = [int(c) for c in color1]
+    color2 = [int(c) for c in color2]
     return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
 
 
