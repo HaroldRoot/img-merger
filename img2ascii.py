@@ -45,8 +45,32 @@ def generate_luminosity_values(pixel_data, invert=False):
     return luminosity_values
 
 
+COLOR_MAP = {
+    # Fore.BLACK: (0, 0, 0),
+    Fore.RED: (255, 0, 0),
+    Fore.GREEN: (0, 255, 0),
+    Fore.YELLOW: (255, 255, 0),
+    Fore.BLUE: (0, 0, 255),
+    Fore.MAGENTA: (255, 0, 255),
+    Fore.CYAN: (0, 255, 255),
+    Fore.WHITE: (255, 255, 255)
+}
+
+
+def euclidean_distance(color1, color2):
+    return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
+
+
+def get_dominant_color(pixel):
+    pixel_color = pixel[:3]
+    distances = {color: euclidean_distance(pixel_color, ref_color) for
+                 color, ref_color in COLOR_MAP.items()}
+    dominant_color = min(distances, key=distances.get)
+    return dominant_color
+
+
 # K-means clustering method
-def img2ascii_kmeans(frame, K=5):
+def img2ascii_kmeans(frame, K=5, colorful=False):
     if len(frame.shape) == 2:
         frame = np.stack([frame] * 3, axis=-1)
 
@@ -77,45 +101,28 @@ def img2ascii_kmeans(frame, K=5):
     labels_picked = [labels[rows * width:(rows + 1) * width] for rows in
                      range(height)]
 
-    # Generate ASCII characters for the image
     ascii_art = []
-    for rows in labels_picked:
+    for row_idx, rows in enumerate(labels_picked):
         row_art = ""
-        for col in rows:
+        for col_idx, col in enumerate(rows):
             if col <= shadow_bound:
-                row_art += str(random.randint(2, 9))  # Shadow clusters
+                c = str(random.randint(2, 9))
             elif col <= bright_bound:
-                row_art += "-"  # Mid-clusters
+                c = "-"
             else:
-                row_art += "#"  # Bright clusters
+                c = "#"
+
+            if colorful:
+                # Extract RGB color of the pixel
+                pixel = frame[row_idx, col_idx]
+                dominant_color = get_dominant_color(pixel)
+                row_art += dominant_color + c + c  # Add color and character
+            else:
+                row_art += c + c
+
         ascii_art.append(row_art)
 
-    # Return the final ASCII art as a string
-    return "\n".join(["".join(char * 2 for char in row) for row in ascii_art])
-
-
-COLOR_MAP = {
-    # Fore.BLACK: (0, 0, 0),
-    Fore.RED: (255, 0, 0),
-    Fore.GREEN: (0, 255, 0),
-    Fore.YELLOW: (255, 255, 0),
-    Fore.BLUE: (0, 0, 255),
-    Fore.MAGENTA: (255, 0, 255),
-    Fore.CYAN: (0, 255, 255),
-    Fore.WHITE: (255, 255, 255)
-}
-
-
-def euclidean_distance(color1, color2):
-    return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
-
-
-def get_dominant_color(pixel):
-    pixel_color = pixel[:3]
-    distances = {color: euclidean_distance(pixel_color, ref_color) for
-                 color, ref_color in COLOR_MAP.items()}
-    dominant_color = min(distances, key=distances.get)
-    return dominant_color
+    return "\n".join(ascii_art)
 
 
 def map_brightness_to_ascii(luminosity_values, pixel_data, colorful=False):
@@ -160,7 +167,7 @@ def img2ascii_brightness(img, width, height, invert=False, colorful=False):
 
 # Generate ASCII art from an image
 def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
-                       colorful=False):
+                       colorful=False, K=5):
     try:
         with Image.open(image_path) as img:
             original_width, original_height = img.size
@@ -173,7 +180,7 @@ def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
 
             if kmeans:
                 frame = np.array(img)
-                return img2ascii_kmeans(frame, K=5)
+                return img2ascii_kmeans(frame, K, colorful)
             else:
                 return img2ascii_brightness(img, width, height, invert,
                                             colorful)
