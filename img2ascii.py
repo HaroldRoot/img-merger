@@ -183,8 +183,11 @@ def pixel_data_to_ascii_art(pixel_data):
 
 
 def img2ascii_test(img, width, height):
+    new_width = int(width * 2 / 3)
+    img = img.resize((new_width, height), Image.Resampling.LANCZOS)
+
     pixel_data = [
-        [img.getpixel((x, y)) for x in range(width)]
+        [img.getpixel((x, y)) for x in range(new_width)]
         for y in range(height)
     ]
     return pixel_data_to_ascii_art(pixel_data)
