@@ -34,7 +34,7 @@ def invert_brightness(brightness):
 
 
 # Convert pixel data to brightness values, with optional inversion
-def generate_luminosity_values(pixel_data, invert=False):
+def generate_luminosity_values(pixel_data, brightness_method, invert=False):
     luminosity_values = [[brightness_method(pixel) for pixel in row] for row in
                          pixel_data]
 
@@ -58,20 +58,17 @@ COLOR_MAP = {
 
 
 def euclidean_distance(color1, color2):
-    color1 = [int(c) for c in color1]
-    color2 = [int(c) for c in color2]
-    return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
+    return math.sqrt(
+        sum((int(c1) - int(c2)) ** 2 for c1, c2 in zip(color1, color2)))
 
 
 def get_dominant_color(pixel):
     pixel_color = pixel[:3]
     distances = {color: euclidean_distance(pixel_color, ref_color) for
                  color, ref_color in COLOR_MAP.items()}
-    dominant_color = min(distances, key=distances.get)
-    return dominant_color
+    return min(distances, key=distances.get)
 
 
-# K-means clustering method
 def img2ascii_kmeans(frame, K=5, colorful=False):
     if len(frame.shape) == 2:
         frame = np.stack([frame] * 3, axis=-1)
@@ -84,22 +81,16 @@ def img2ascii_kmeans(frame, K=5, colorful=False):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     flags = cv2.KMEANS_RANDOM_CENTERS
 
-    compactness, labels, centroids = cv2.kmeans(frame_array, K, bestLabels,
-                                                criteria, 10, flags)
+    _, labels, centroids = cv2.kmeans(frame_array, K, bestLabels, criteria, 10,
+                                      flags)
     centroids = np.uint8(centroids)
 
     centroids_sorted = sorted(centroids.flatten())
     centroids_index = np.array(
         [centroids_sorted.index(value) for value in centroids.flatten()])
 
-    bright = [abs((3 * i - 2 * K) / (3 * K)) for i in range(1, 1 + K)]
-    bright_bound = bright.index(np.min(bright))
-    shadow = [abs((3 * i - K) / (3 * K)) for i in range(1, 1 + K)]
-    shadow_bound = shadow.index(np.min(shadow))
-
     labels = labels.flatten()
     labels = centroids_index[labels]
-
     labels_picked = [labels[rows * width:(rows + 1) * width] for rows in
                      range(height)]
 
@@ -107,21 +98,14 @@ def img2ascii_kmeans(frame, K=5, colorful=False):
     for row_idx, rows in enumerate(labels_picked):
         row_art = ""
         for col_idx, col in enumerate(rows):
-            if col <= shadow_bound:
-                c = str(random.randint(2, 9))
-            elif col <= bright_bound:
-                c = "-"
-            else:
-                c = "#"
-
+            char = "#" if col == K - 1 else "-" if col >= K // 2 else str(
+                random.randint(2, 9))
             if colorful:
-                # Extract RGB color of the pixel
                 pixel = frame[row_idx, col_idx]
                 dominant_color = get_dominant_color(pixel)
-                row_art += dominant_color + c + c  # Add color and character
+                row_art += dominant_color + char * 2
             else:
-                row_art += c + c
-
+                row_art += char * 2
         ascii_art.append(row_art)
 
     return "\n".join(ascii_art)
@@ -134,55 +118,49 @@ def map_brightness_to_ascii(luminosity_values, pixel_data, colorful=False):
         for row_idx, row in enumerate(luminosity_values):
             row_art = ""
             for col_idx, lum in enumerate(row):
-                # Get the dominant color for the pixel
                 pixel = pixel_data[row_idx][col_idx]
                 dominant_color = get_dominant_color(pixel)
-
-                # If there's a dominant color, use that for the printout
-                if dominant_color:
-                    c = characters[round((lum / 255) * scale)]
-                    row_art += dominant_color + c + c
-                else:
-                    # For grayscale, use the calculated brightness for the ASCII
-                    # character
-                    c = characters[round((lum / 255) * scale)]
-                    row_art += Fore.WHITE + c + c
+                c = characters[round((lum / 255) * scale)]
+                row_art += dominant_color + c * 2
             ascii_art.append(row_art)
-        ascii_art = "\n".join(ascii_art)
     else:
         for row in luminosity_values:
-            ascii_art.append(
-                [characters[round((lum / 255) * scale)] for lum in row])
-        ascii_art = "\n".join(["".join(char * 2 for char in row) for row in
-                               ascii_art])
-
-    return ascii_art
+            ascii_art.append("".join(
+                characters[round((lum / 255) * scale)] * 2 for lum in row))
+    return "\n".join(ascii_art)
 
 
-def img2ascii_brightness(img, width, height, invert=False, colorful=False):
+def img2ascii_brightness(img, width, height, brightness_method, invert=False,
+                         colorful=False):
     pixel_data = [[img.getpixel((x, y)) for x in range(width)] for y in
                   range(height)]
-    luminosity_values = generate_luminosity_values(pixel_data, invert)
-    ascii_art = map_brightness_to_ascii(luminosity_values, pixel_data, colorful)
-    return ascii_art
+    luminosity_values = generate_luminosity_values(pixel_data,
+                                                   brightness_method, invert)
+    return map_brightness_to_ascii(luminosity_values, pixel_data,
+                                   colorful)
 
 
-def pixel_data_to_ascii_art(pixel_data):
+def pixel_data_to_rgb_ascii(pixel_data):
     scale = len(characters) - 1
 
     ascii_art = "\n".join(
         "".join(
-            f"{Fore.RED}{characters[round((r / 255) * scale)]}"
-            f"{Fore.GREEN}{characters[round((g / 255) * scale)]}"
-            f"{Fore.BLUE}{characters[round((b / 255) * scale)]}{Fore.RESET}"
-            for r, g, b in row
+            (
+                f"{Fore.RED}{characters[round((pixel[0] / 255) * scale)]}"
+                f"{Fore.GREEN}{characters[round((pixel[1] / 255) * scale)]}"
+                f"{Fore.BLUE}{characters[round((pixel[2] / 255) * scale)]}"
+                if isinstance(pixel, (tuple, list)) and len(pixel) >= 3 and all(
+                    isinstance(c, (int, float)) for c in pixel[:3])
+                else "   "  # 用空格占位以保证行列对齐
+            )
+            for pixel in row
         )
         for row in pixel_data
     )
     return ascii_art
 
 
-def img2ascii_test(img, width, height):
+def img2ascii_rgb(img, width, height):
     new_width = int(width * 2 / 3)
     img = img.resize((new_width, height), Image.Resampling.LANCZOS)
 
@@ -190,104 +168,78 @@ def img2ascii_test(img, width, height):
         [img.getpixel((x, y)) for x in range(new_width)]
         for y in range(height)
     ]
-    return pixel_data_to_ascii_art(pixel_data)
+    return pixel_data_to_rgb_ascii(pixel_data)
 
 
-# Generate ASCII art from an image
-def generate_ascii_art(max_width, max_height, kmeans=False, invert=False,
-                       colorful=False, K=5, test=False):
+def generate_ascii_art(image_path, max_width, max_height, brightness_method,
+                       kmeans=False, invert=False, colorful=False, K=5,
+                       rgb=False, color=None):
     try:
         with Image.open(image_path) as img:
-            original_width, original_height = img.size
-            logger.info(f"Loaded image: {image_path} "
-                        f"({original_width}x{original_height})")
-
             img.thumbnail((max_width, max_height))
             width, height = img.size
-            logger.info(f"Resized image to: {width}x{height}")
 
-            if kmeans:
+            if rgb:
+                return img2ascii_rgb(img, width, height)
+            elif kmeans:
                 frame = np.array(img)
                 return img2ascii_kmeans(frame, K, colorful)
-            elif test:
-                return img2ascii_test(img, width, height)
             else:
-                return img2ascii_brightness(img, width, height, invert,
-                                            colorful)
+                ascii_art = img2ascii_brightness(img, width, height,
+                                                 brightness_method, invert,
+                                                 colorful)
+                if color and color in COLOR_MAP:
+                    ascii_art = "\n".join(
+                        color + line for line in ascii_art.splitlines())
+                return ascii_art
 
-    except FileNotFoundError:
-        logger.error(f"Image file not found: {image_path}")
-    except UnidentifiedImageError:
-        logger.error(f"Invalid image file: {image_path}")
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+    except (FileNotFoundError, UnidentifiedImageError):
+        logger.error(f"Error processing image: {image_path}")
+        return None
 
 
-# Parse command-line arguments
 def parse_args():
     parser = argparse.ArgumentParser(description="Convert image to ASCII art.")
     parser.add_argument("input_paths", nargs="+",
                         help="Paths to input image files.")
     parser.add_argument("-W", "--width", type=int, default=940,
-                        help="Max width of output (default: 470).")
+                        help="Max width of output (default: 940).")
     parser.add_argument("-H", "--height", type=int, default=470,
-                        help="Max height of output (default: 235).")
-    parser.add_argument("-o", "--output", type=str,
-                        help="Path to save ASCII art to a file.")
+                        help="Max height of output (default: 470).")
     parser.add_argument("-b", "--brightness",
                         choices=["average", "min_max", "luminosity"],
                         default="luminosity", help="Brightness mapping method "
                                                    "(default: luminosity).")
     parser.add_argument("-k", "--kmeans", action="store_true",
-                        help="Use K-means clustering to generate ASCII art.")
-    parser.add_argument("-q", "--quiet", action="store_true",
-                        help="Suppress informational output.")
-    parser.add_argument("-c", "--color",
-                        choices=["red", "green", "yellow", "blue", "magenta",
-                                 "cyan", "white"], default="white",
-                        help="Color for the ASCII output (default: white).")
-    parser.add_argument("-f", "--colorful", action="store_true",
+                        help="Use K-means clustering for ASCII art.")
+    parser.add_argument("-c", "--colorful", action="store_true",
                         help="Enable colorful ASCII art.")
     parser.add_argument("-i", "--invert", action="store_true",
-                        help="Invert brightness values (dark becomes light "
-                             "and vice versa).")
-    parser.add_argument("--test", action="store_true",
-                        help="This is a temporary option set to test new "
-                             "features.")
+                        help="Invert brightness values.")
+    parser.add_argument("--rgb", action="store_true",
+                        help="Use RGB mode for ASCII art (colorful per pixel).")
+    parser.add_argument("--color",
+                        choices=["red", "green", "yellow", "blue", "magenta",
+                                 "cyan", "white"],
+                        help="Specify ASCII art color.")
     return parser.parse_args()
 
 
-color_map = {"red": Fore.RED, "green": Fore.GREEN, "yellow": Fore.YELLOW,
-             "blue": Fore.BLUE, "magenta": Fore.MAGENTA, "cyan": Fore.CYAN,
-             "white": Fore.WHITE}
-
 if __name__ == "__main__":
     args = parse_args()
-
-    # Configure logger verbosity
-    if args.quiet:
-        logger.setLevel("ERROR")
-
     brightness_methods = {"average": calculate_brightness_average,
                           "min_max": calculate_brightness_min_max,
                           "luminosity": calculate_brightness_luminosity}
-
     brightness_method = brightness_methods[args.brightness]
 
     for image_path in args.input_paths:
-        ascii_output = generate_ascii_art(args.width, args.height,
-                                          kmeans=args.kmeans,
-                                          invert=args.invert,
-                                          colorful=args.colorful,
-                                          test=args.test)
-
+        ascii_output = generate_ascii_art(image_path, args.width, args.height,
+                                          brightness_method, args.kmeans,
+                                          args.invert, args.colorful,
+                                          rgb=args.rgb,
+                                          color=getattr(Fore,
+                                                        args.color.upper(),
+                                                        None) if args.color
+                                          else None)
         if ascii_output:
-            color = color_map[args.color]
-            colored_output = color + ascii_output
-
-            if args.output:
-                with open(args.output, "w") as f:
-                    f.write(ascii_output)
-                logger.info(f"Saved ASCII art to {args.output}")
-            else:
-                print(colored_output)
+            print(ascii_output)
