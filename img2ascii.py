@@ -1,6 +1,7 @@
 import argparse
 import math
 import random
+import time
 
 import cv2
 import numpy as np
@@ -171,11 +172,15 @@ def img2ascii_rgb(img, width, height):
     return pixel_data_to_rgb_ascii(pixel_data)
 
 
-def generate_ascii_art(image_path, max_width, max_height, brightness_method,
+def generate_ascii_art(input_path, max_width, max_height, brightness_method,
                        kmeans=False, invert=False, colorful=False, K=5,
                        rgb=False, color=None):
     try:
-        with Image.open(image_path) as img:
+        if input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+            return process_video_to_ascii(input_path, max_width // 3,
+                                          max_height // 3, colorful)
+
+        with Image.open(input_path) as img:
             img.thumbnail((max_width, max_height))
             width, height = img.size
 
@@ -194,14 +199,46 @@ def generate_ascii_art(image_path, max_width, max_height, brightness_method,
                 return ascii_art
 
     except (FileNotFoundError, UnidentifiedImageError):
-        logger.error(f"Error processing image: {image_path}")
+        logger.error(f"Error processing input: {input_path}")
         return None
 
 
+def process_video_to_ascii(video_path, width, height, colorful=False, fps=10):
+    try:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            logger.error(f"Cannot open video: {video_path}")
+            return
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Resize frame for better performance
+            frame = cv2.resize(frame, (width, height),
+                               interpolation=cv2.INTER_LINEAR)
+
+            # Convert to ASCII
+            frame_ascii = img2ascii_kmeans(frame, K=5, colorful=colorful)
+
+            # Clear screen and print ASCII art
+            print("\033[H\033[J", end="")
+            print(frame_ascii)
+
+            # Control the frame rate
+            time.sleep(1 / fps)
+
+        cap.release()
+
+    except Exception as e:
+        logger.error(f"Error processing video: {e}")
+
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="Convert image to ASCII art.")
+    parser = argparse.ArgumentParser(description="Convert media to ASCII art.")
     parser.add_argument("input_paths", nargs="+",
-                        help="Paths to input image files.")
+                        help="Paths to input media files (images or videos).")
     parser.add_argument("-W", "--width", type=int, default=940,
                         help="Max width of output (default: 940).")
     parser.add_argument("-H", "--height", type=int, default=470,
@@ -222,6 +259,9 @@ def parse_args():
                         choices=["red", "green", "yellow", "blue", "magenta",
                                  "cyan", "white"],
                         help="Specify ASCII art color.")
+    parser.add_argument("--fps", type=int, default=10,
+                        help="Frames per second for ASCII animation "
+                             "(default: 10).")
     return parser.parse_args()
 
 
@@ -232,11 +272,11 @@ if __name__ == "__main__":
                           "luminosity": calculate_brightness_luminosity}
     brightness_method = brightness_methods[args.brightness]
 
-    for image_path in args.input_paths:
-        ascii_output = generate_ascii_art(image_path, args.width, args.height,
-                                          brightness_method, args.kmeans,
-                                          args.invert, args.colorful,
-                                          rgb=args.rgb,
+    for input_path in args.input_paths:
+        ascii_output = generate_ascii_art(input_path, args.width,
+                                          args.height, brightness_method,
+                                          args.kmeans, args.invert,
+                                          args.colorful, rgb=args.rgb,
                                           color=getattr(Fore,
                                                         args.color.upper(),
                                                         None) if args.color
